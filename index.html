@@ -71,7 +71,8 @@ function getLocal(){try{return JSON.parse(localStorage.getItem(localKey)||'[]')}
 function saveLocal(a){localStorage.setItem(localKey,JSON.stringify(a))}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[m]))}
 function mergeLocal(){const a=getLocal();const ids=new Set(DATA.map(x=>x.id));a.forEach(x=>{if(!ids.has(x.id))DATA.push(x)})}
-function cloudBase(){return SUPABASE_URL.replace(/\/$/,'')}\nfunction rowToEntry(x){const links=Array.isArray(x.links)?x.links.map(l=>Array.isArray(l)?l:(l&&typeof l==='object'?[l.label||'影片',l.url||'']:[])).filter(l=>l.length>=2):[];return {id:x.id,s:x.s||'community',t:x.t||'未命名',k:Array.isArray(x.k)?x.k:[],p:x.p||'待確認',d:x.d||'待確認',time:x.time||'待確認',note:x.note||'',links,created_at:x.created_at||null}}
+function cloudBase(){return SUPABASE_URL.replace(/\/$/,'')}
+function rowToEntry(x){const links=Array.isArray(x.links)?x.links.map(l=>Array.isArray(l)?l:(l&&typeof l==='object'?[l.label||'影片',l.url||'']:[])).filter(l=>l.length>=2):[];return {id:x.id,s:x.s||'community',t:x.t||'未命名',k:Array.isArray(x.k)?x.k:[],p:x.p||'待確認',d:x.d||'待確認',time:x.time||'待確認',note:x.note||'',links,created_at:x.created_at||null}}
 function setSyncStatus(t){document.getElementById('syncStatus').textContent=t;const b=document.getElementById('cloudBadge');if(b)b.textContent=t.includes('🟢')?'🟢 已同步':t.includes('🟡')?'🟡 部分連線':'⚪ 未連線'}
 async function startRealtime(){
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY||!window.supabase){return}
