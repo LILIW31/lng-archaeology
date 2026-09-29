@@ -75,7 +75,7 @@ function canonicalId(v){const m=String(v??'').match(/^LNG-(\d+)$/i);return m?'LN
 function normalizeAndDedupe(entries){const map=new Map();for(const raw of entries){const x={...raw,id:canonicalId(raw.id)};const prev=map.get(x.id);if(!prev||x.created_at||x.s==='user'||x.links?.length)map.set(x.id,x)}return [...map.values()]}
 DATA=normalizeAndDedupe(DATA);
 let filter='all';
-function isHighlight(x){const s=[x.t,x.note,...(x.k||[])].join(" ").toLowerCase();return !(s.includes("原始vod")||s.includes("原始 v")||s.includes("直播紀錄")||s.includes("直播紀錄檔")||s.includes("vod")&&s.includes("原始"))}
+function isHighlight(x){const t=String(x.t??'').toLowerCase();return !(t.includes("原始vod")||t.includes("原始 v")||t.includes("直播紀錄")||t.includes("直播紀錄檔")||(t.includes("vod")&&t.includes("原始")))}
 const localKey='LNG_USER_REPORTS_V1';
 function getLocal(){try{return JSON.parse(localStorage.getItem(localKey)||'[]')}catch{return[]}}
 function saveLocal(a){localStorage.setItem(localKey,JSON.stringify(a))}
