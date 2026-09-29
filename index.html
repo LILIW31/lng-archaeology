@@ -60,8 +60,8 @@ const BASE_DATA=[
 ];
 const DEFAULT_SUPABASE_URL = 'https://qpwqjraegxwxytlhzfmr.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'sb_publishable_DMT8Fbyowdu3IGGZIGU3eg_3NEbtdjr';
-let SUPABASE_URL = localStorage.getItem('LNG_SUPABASE_URL') || DEFAULT_SUPABASE_URL;
-let SUPABASE_ANON_KEY = localStorage.getItem('LNG_SUPABASE_ANON_KEY') || DEFAULT_SUPABASE_KEY;
+let SUPABASE_URL = DEFAULT_SUPABASE_URL;
+let SUPABASE_ANON_KEY = DEFAULT_SUPABASE_KEY;
 let sbClient = null, realtimeChannel = null, syncCheckTimer = null;
 let DATA = [...BASE_DATA];
 let filter='all';
@@ -128,13 +128,14 @@ async function syncCloud(withRealtime=true){
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){setSyncStatus('同步狀態：🔴 未設定雲端');return}
  setSyncStatus('同步狀態：🟢 雲端同步運作中');
  try{
-  const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=id&limit=1',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY}});
+  const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),8000);
+  const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=id&limit=1',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},signal:controller.signal}); clearTimeout(timeout);
   if(!r.ok)throw Error('HTTP '+r.status);
-  const rows=await (await fetch(cloudBase()+'/rest/v1/lng_entries?select=*',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY}})).json();
+  const r2=await fetch(cloudBase()+'/rest/v1/lng_entries?select=*',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY}}); if(!r2.ok)throw Error('HTTP '+r2.status); const rows=await r2.json();
   const remote=rows.map(rowToEntry); const byId=new Map(DATA.map(x=>[x.id,x])); remote.forEach(x=>byId.set(x.id,x)); DATA=[...byId.values()]; render();
   setSyncStatus('同步狀態：🟢 雲端已同步｜'+remote.length+' 筆資料');
   if(withRealtime)await startRealtime();
- }catch(e){setSyncStatus('同步狀態：🔴 雲端連線失敗')}
+ }catch(e){setSyncStatus('同步狀態：🔴 雲端連線失敗｜請稍後自動重試')}
 }
 async function submitCloud(x){
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)return null;
