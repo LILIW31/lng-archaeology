@@ -129,9 +129,10 @@ async function syncCloud(withRealtime=true){
  setSyncStatus('同步狀態：🟢 雲端同步運作中');
  try{
   const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),8000);
-  const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=id&limit=1',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},signal:controller.signal}); clearTimeout(timeout);
+  const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=*',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},signal:controller.signal});
+  clearTimeout(timeout);
   if(!r.ok)throw Error('HTTP '+r.status);
-  const r2=await fetch(cloudBase()+'/rest/v1/lng_entries?select=*',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY}}); if(!r2.ok)throw Error('HTTP '+r2.status); const rows=await r2.json();
+  const rows=await r.json();
   const remote=rows.map(rowToEntry); const byId=new Map(DATA.map(x=>[x.id,x])); remote.forEach(x=>byId.set(x.id,x)); DATA=[...byId.values()]; render();
   setSyncStatus('同步狀態：🟢 雲端已同步｜'+remote.length+' 筆資料');
   if(withRealtime)await startRealtime();
