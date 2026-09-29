@@ -7,6 +7,6 @@
 <script>
 const btn=document.getElementById('btn'),result=document.getElementById('result'),letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 function normal(){let s='';for(let i=0;i<4;i++)s+=letters[Math.floor(Math.random()*26)];return s+'-'+String(Math.floor(Math.random()*1000)).padStart(3,'0')}
-function draw(){if(btn.disabled)return;btn.disabled=true;let special=Math.floor(Math.random()*2)===0;if(special){result.innerHTML='<div class="code special">🎉 NYKD-054</div><div class="small">正在跳轉...</div>';window.location.href='https://airav.io/video?hid=QC-CT-55';return}result.innerHTML='<div class="code">'+normal()+'</div><div class="small">抽選完成</div>';btn.disabled=false}
+function draw(){if(btn.disabled)return;btn.disabled=true;let special=Math.floor(Math.random()*2)===0;if(special){result.innerHTML='<div class="code special">🎉 NYKD-054</div><div class="small">特殊結果！</div>';btn.disabled=false;return}const topics=['funny videos','music','gaming','travel','food','animals','sports','technology','Taiwan','shorts'];const topic=topics[Math.floor(Math.random()*topics.length)];const query=topic+' '+Math.floor(Math.random()*100000);result.innerHTML='<div class="code">'+normal()+'</div><div class="small">正在前往 YouTube 隨機影片...</div>';setTimeout(()=>{window.location.href='https://www.youtube.com/results?search_query='+encodeURIComponent(query)},150)}
 btn.addEventListener('click',draw);btn.addEventListener('touchend',e=>{e.preventDefault();draw()},{passive:false});
 </script></body></html>
