@@ -7,6 +7,6 @@
 <script>
 const btn=document.getElementById('btn'),result=document.getElementById('result'),letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 function normal(){let s='';for(let i=0;i<4;i++)s+=letters[Math.floor(Math.random()*26)];return s+'-'+String(Math.floor(Math.random()*1000)).padStart(3,'0')}
-function draw(){if(btn.disabled)return;btn.disabled=true;result.innerHTML='<div class="small">🎲 抽選中...</div>';setTimeout(()=>{let special=Math.floor(Math.random()*2)===0;result.innerHTML=special?'<div class="code special">🎉 NYKD-054</div><div class="small">特殊結果！</div>':'<div class="code">'+normal()+'</div><div class="small">抽選完成</div>';btn.disabled=false},350)}
+function draw(){if(btn.disabled)return;btn.disabled=true;result.innerHTML='<div class="small">🎲 抽選中...</div>';setTimeout(()=>{let special=Math.floor(Math.random()*2)===0;result.innerHTML=special?'<div class="code special">🎉 NYKD-054</div><div class="small">特殊結果！即將前往 Google 搜尋</div>':'<div class="code">'+normal()+'</div><div class="small">抽選完成</div>';if(special){setTimeout(()=>{window.location.href='https://www.google.com/search?q='+encodeURIComponent('NYKD-054')},700)}btn.disabled=false},350)}
 btn.addEventListener('click',draw);btn.addEventListener('touchend',e=>{e.preventDefault();draw()},{passive:false});
 </script></body></html>
