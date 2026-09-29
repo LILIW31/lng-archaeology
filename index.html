@@ -142,15 +142,18 @@ const q=document.getElementById('q'),list=document.getElementById('list');
 let sortMode='newest';
 let currentPage=1;
 const PAGE_SIZE=10;
-function createdTime(x,index){const t=x.created_at?Date.parse(x.created_at):NaN;return Number.isFinite(t)?t:index}
+function entryIdNumber(x){
+  const m=String(x.id||'').match(/LNG-(\\d+)/i);
+  return m?Number(m[1]):Number.MAX_SAFE_INTEGER;
+}
+function createdTime(x,index){const t=x.created_at?Date.parse(x.created_at):NaN;return Number.isFinite(t)?t:null}
 function sortedEntries(arr){
   return arr.map((x,i)=>({x,i})).sort((a,b)=>{
-    if(sortMode==='id'){
-      const an=parseInt(String(a.x.id).replace(/\\D/g,''),10)||0, bn=parseInt(String(b.x.id).replace(/\\D/g,''),10)||0;
-      return an-bn || a.i-b.i;
-    }
-    const diff=createdTime(a.x,a.i)-createdTime(b.x,b.i);
-    return sortMode==='oldest' ? diff : -diff;
+    if(sortMode==='id') return entryIdNumber(a.x)-entryIdNumber(b.x) || a.i-b.i;
+    const at=createdTime(a.x,a.i), bt=createdTime(b.x,b.i);
+    if(at!==null&&bt!==null) return sortMode==='oldest' ? at-bt : bt-at;
+    if(at!==null||bt!==null) return at!==null ? -1 : 1;
+    return sortMode==='oldest' ? a.i-b.i : b.i-a.i;
   }).map(v=>v.x);
 }
 function render(){
@@ -174,7 +177,7 @@ function render(){
   for(let p=pStart;p<=pEnd;p++)buttons.push(`<button class="pageBtn ${p===currentPage?'active':''}" data-page="${p}">${p}</button>`);
   buttons.push(`<button class="pageBtn" data-page="${currentPage+1}" ${currentPage===totalPages?'disabled':''}>›</button>`);
   pg.innerHTML=buttons.join('')+`<span class="pageInfo">第 ${currentPage} 頁／共 ${totalPages} 頁</span>`;
-  pg.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{const p=Number(b.dataset.page);if(p>=1&&p<=totalPages){currentPage=p;render();window.scrollTo({top:0,behavior:'smooth'});}}));
+  pg.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{const p=Number(btn.dataset.page);if(p>=1&&p<=totalPages){currentPage=p;render();window.scrollTo({top:0,behavior:'smooth'});}}));
 }
 document.getElementById('searchBtn').addEventListener('click',()=>{currentPage=1;q.focus();render()});q.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();currentPage=1;render();q.blur()}});q.addEventListener('input',()=>{currentPage=1;render()});document.getElementById('sortSelect').addEventListener('change',e=>{sortMode=e.target.value;currentPage=1;render()});document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.filters button').forEach(z=>z.classList.remove('active'));b.classList.add('active');filter=b.dataset.f;currentPage=1;render()});
 const reportPanel=document.getElementById('reportPanel');
