@@ -210,7 +210,7 @@ let sortMode='newest';
 let currentPage=1;
 const PAGE_SIZE=10;
 function entryIdNumber(x){
-  const m=String(x.id||'').match(/LNG-(\\d+)/i);
+  const m=String(x.id||'').match(/^LNG-(\d+)$/i);
   return m?Number(m[1]):Number.MAX_SAFE_INTEGER;
 }
 function createdTime(x,index){const t=x.created_at?Date.parse(x.created_at):NaN;return Number.isFinite(t)?t:null}
