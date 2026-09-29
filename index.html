@@ -64,7 +64,7 @@ const DEFAULT_SUPABASE_URL = 'https://qpwqjraegxwxytlhzfmr.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'sb_publishable_DMT8Fbyowdu3IGGZIGU3eg_3NEbtdjr';
 let SUPABASE_URL = DEFAULT_SUPABASE_URL;
 let SUPABASE_ANON_KEY = DEFAULT_SUPABASE_KEY;
-let sbClient = null, realtimeChannel = null, syncCheckTimer = null;
+let sbClient = null, realtimeChannel = null, syncCheckTimer = null, syncInFlight = false;
 let DATA = [...BASE_DATA];
 let filter='all';
 function isHighlight(x){const s=[x.t,x.note,...(x.k||[])].join(" ").toLowerCase();return !(s.includes("原始vod")||s.includes("原始 v")||s.includes("直播紀錄")||s.includes("直播紀錄檔")||s.includes("vod")&&s.includes("原始"))}
@@ -132,8 +132,10 @@ function searchMatches(x,term){
   return qs.some(q=>q && rawN.includes(q));
 }
 async function syncCloud(withRealtime=true){
+ if(syncInFlight)return;
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){setSyncStatus('同步狀態：🔴 未設定雲端');return}
  setSyncStatus('同步狀態：🟢 雲端同步運作中');
+ syncInFlight=true;
  try{
   const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),8000);
   const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=*',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},signal:controller.signal});
@@ -144,13 +146,16 @@ async function syncCloud(withRealtime=true){
   setSyncStatus('同步狀態：🟢 雲端已同步｜'+remote.length+' 筆資料');
   if(withRealtime)await startRealtime();
  }catch(e){setSyncStatus('同步狀態：🔴 雲端連線失敗｜'+(e&&e.name==='AbortError'?'連線逾時':'請稍後自動重試'))}
+ finally{syncInFlight=false}
 }
 async function submitCloud(x){
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)throw new Error('雲端設定不存在');
  if(!sbClient&&window.supabase)sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
  if(!sbClient)throw new Error('Supabase SDK 尚未載入');
+ const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('回報連線逾時，請稍後再試')),10000));
  try{
-  const {data,error}=await sbClient.rpc('merge_lng_entry',{p_entry:x});
+  const request=sbClient.rpc('merge_lng_entry',{p_entry:x});
+  const {data,error}=await Promise.race([request,timeout]);
   if(error)throw new Error(error.message||'Supabase 回報失敗');
   if(!data||!data.action)throw new Error('雲端沒有回傳有效結果');
   return data;
@@ -213,7 +218,7 @@ document.getElementById('reportForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const form=e.target,btn=form.querySelector('button[type="submit"]'),f=new FormData(form),video=String(f.get('video')||'').trim(),title=String(f.get('title')||'').trim(),keywords=String(f.get('keywords')||'').split(/[,，、]/).map(v=>v.trim()).filter(Boolean);
  if(!title||!keywords.length||!video){alert('請完整填寫：精華影片名稱、關鍵字、影片網址。');return}
- try{new URL(video)}catch{alert('影片網址格式不正確，請貼上完整網址。');return}
+ try{const u=new URL(video);if(!/^https?:$/.test(u.protocol))throw Error()}catch{alert('影片網址格式不正確，請使用 http:// 或 https:// 公開網址。');return}
  btn.disabled=true;btn.textContent='送出中…';setSyncStatus('同步狀態：🟡 正在送出使用者回報…');
  const x={id:'LNG-0',s:'user',t:title,k:keywords,p:String(f.get('people')||'').trim()||'待確認',d:String(f.get('date')||'').trim()||'待確認',time:String(f.get('time')||'').trim()||'待確認',note:`使用者回報${f.get('reporter')?'（'+String(f.get('reporter')).trim()+'）':''}：${String(f.get('note')||'').trim()||'無補充說明'}${String(f.get('relatedIds')||'').trim()?'｜使用者指出重複編號：'+String(f.get('relatedIds')).trim():''}`,links:[['影片',video]]};
  try{const result=await submitCloud(x);await syncCloud(false);form.reset();currentPage=1;filter='all';document.querySelectorAll('.filters button').forEach(z=>z.classList.toggle('active',z.dataset.f==='all'));render();const merged=result.action==='merged';setSyncStatus('同步狀態：🟢 已寫入 Supabase｜'+(merged?'已自動整合到既有資料':'已新增考古資料'));alert(merged?'回報成功！系統已找到重疊資料並整合。':'回報成功！已新增到共同考古資料庫，其他使用者可立即看到。')}
