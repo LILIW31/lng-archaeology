@@ -64,7 +64,12 @@ const DEFAULT_SUPABASE_URL = 'https://qpwqjraegxwxytlhzfmr.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'sb_publishable_DMT8Fbyowdu3IGGZIGU3eg_3NEbtdjr';
 let SUPABASE_URL = DEFAULT_SUPABASE_URL;
 let SUPABASE_ANON_KEY = DEFAULT_SUPABASE_KEY;
-let sbClient = null, realtimeChannel = null, syncCheckTimer = null, syncInFlight = false;
+let sbClient = null, realtimeChannel = null, syncCheckTimer = null, syncInFlight = false, syncRetryTimer = null, syncStarted = false, lastSyncAt = 0;
+const SYNC_TIMEOUT_MS=12000;
+const SYNC_RETRY_MS=5000;
+function clearSyncRetry(){if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}}
+function scheduleSyncRetry(){clearSyncRetry();syncRetryTimer=setTimeout(()=>{syncRetryTimer=null;if(document.visibilityState!=='hidden')syncCloud(true)},SYNC_RETRY_MS)}
+
 let DATA = [...BASE_DATA];
 function canonicalId(v){const m=String(v??'').match(/^LNG-(\d+)$/i);return m?'LNG-'+String(Number(m[1])).padStart(3,'0'):String(v??'')}
 function normalizeAndDedupe(entries){const map=new Map();for(const raw of entries){const x={...raw,id:canonicalId(raw.id)};const prev=map.get(x.id);if(!prev||x.created_at||x.s==='user'||x.links?.length)map.set(x.id,x)}return [...map.values()]}
@@ -80,16 +85,47 @@ function cloudBase(){return SUPABASE_URL.replace(/\/$/,'')}
 function rowToEntry(x){const links=Array.isArray(x.links)?x.links.map(l=>Array.isArray(l)?l:(l&&typeof l==='object'?[l.label||'影片',l.url||'']:[])).filter(l=>l.length>=2):[];return {id:canonicalId(x.id),s:x.s||'community',t:x.t||'未命名',k:Array.isArray(x.k)?x.k:[],p:x.p||'待確認',d:x.d||'待確認',time:x.time||'待確認',note:x.note||'',links,created_at:x.created_at||null}}
 function setSyncStatus(t){document.getElementById('syncStatus').textContent=t;const b=document.getElementById('cloudBadge');if(b)b.textContent=t.includes('🟢')?'🟢 已同步':t.includes('🟡')?'🟡 部分連線':'⚪ 未連線'}
 async function startRealtime(){
- if(!SUPABASE_URL||!SUPABASE_ANON_KEY||!window.supabase){return}
+ if(syncStarted&&realtimeChannel)return true;
+ if(!SUPABASE_URL||!SUPABASE_ANON_KEY||!window.supabase)return false;
  try{
-  if(realtimeChannel&&sbClient){await sbClient.removeChannel(realtimeChannel);realtimeChannel=null}
-  sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-  realtimeChannel=sbClient.channel('lng-live-sync')
-   .on('postgres_changes',{event:'INSERT',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);DATA=normalizeAndDedupe([...DATA,x]);render();setSyncStatus('同步狀態：🟢 即時連線｜剛收到新資料')}})
+  if(!sbClient)sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  if(realtimeChannel)await sbClient.removeChannel(realtimeChannel).catch(()=>{});
+  realtimeChannel=sbClient.channel('lng-live-sync',{config:{broadcast:{ack:true}}})
+   .on('postgres_changes',{event:'INSERT',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);DATA=normalizeAndDedupe([...DATA,x]);render();setSyncStatus('同步狀態：🟢 即時連線｜剛收到新資料')})
    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);DATA=normalizeAndDedupe([...DATA.filter(y=>y.id!==x.id),x]);render();setSyncStatus('同步狀態：🟢 即時連線｜資料已更新')})
-   .on('postgres_changes',{event:'DELETE',schema:'public',table:'lng_entries'},payload=>{DATA=DATA.filter(y=>y.id!==payload.old.id);render();setSyncStatus('同步狀態：🟢 即時連線｜資料已刪除')})
-   .subscribe(status=>{if(status==='SUBSCRIBED')setSyncStatus('同步狀態：🟢 Supabase 即時連線｜其他使用者新增資料會立即出現');else if(status==='CHANNEL_ERROR')setSyncStatus('同步狀態：🟡 雲端可讀取，但即時推播未連線')});
- }catch(e){setSyncStatus('同步狀態：🟡 雲端可讀取，但即時推播啟動失敗')}
+   .on('postgres_changes',{event:'DELETE',schema:'public',table:'lng_entries'},payload=>{const id=canonicalId(payload.old.id);DATA=DATA.filter(y=>y.id!==id);render();setSyncStatus('同步狀態：🟢 即時連線｜資料已刪除')});
+  return await new Promise(resolve=>{
+   let settled=false;
+   const finish=v=>{if(settled)return;settled=true;clearTimeout(timer);resolve(v)};
+   const timer=setTimeout(()=>finish(false),8000);
+   realtimeChannel.subscribe(status=>{
+    if(status==='SUBSCRIBED'){syncStarted=true;setSyncStatus('同步狀態：🟢 Supabase 即時連線｜其他使用者新增資料會立即出現');finish(true)}
+    else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){finish(false)}
+   });
+  });
+ }catch(e){return false}
+}
+async function syncCloud(withRealtime=true){
+ if(syncInFlight)return;
+ if(!SUPABASE_URL||!SUPABASE_ANON_KEY){setSyncStatus('同步狀態：🔴 未設定雲端');return}
+ clearSyncRetry();
+ syncInFlight=true;
+ setSyncStatus('同步狀態：🟡 連線雲端中…');
+ try{
+  const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),SYNC_TIMEOUT_MS);
+  const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=*&order=created_at.asc',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY,Accept:'application/json'},cache:'no-store',signal:controller.signal});
+  clearTimeout(timeout);
+  if(!r.ok)throw Error('HTTP '+r.status);
+  const rows=await r.json();
+  const remote=rows.map(rowToEntry); DATA=normalizeAndDedupe([...DATA,...remote]); const remoteById=new Map(remote.map(x=>[x.id,x])); DATA=DATA.map(x=>remoteById.get(x.id)||x); render();
+  lastSyncAt=Date.now();
+  setSyncStatus('同步狀態：🟢 雲端已同步｜'+remote.length+' 筆資料');
+  if(withRealtime&&!realtimeChannel){const ok=await startRealtime();if(!ok)setSyncStatus('同步狀態：🟢 雲端已同步｜即時推播待重試');}
+  if(withRealtime&&realtimeChannel)syncStarted=true;
+ }catch(e){
+  setSyncStatus('同步狀態：🟡 雲端暫時連線中斷｜5 秒後自動重試');
+  scheduleSyncRetry();
+ }finally{syncInFlight=false}
 }
 
 function duplicateKey(x){return [x.t,x.time,(x.links||[]).map(a=>a[1]).join('|'),(x.k||[]).join('|')].join('¦').toLowerCase()}
@@ -165,8 +201,9 @@ async function submitCloud(x){
  }catch(e){throw e}
 }
 mergeLocal();
-// Realtime 是主同步機制；每 30 秒做一次輕量輪詢作為斷線／漏事件的備援。
-syncCheckTimer=setInterval(()=>{if(document.visibilityState!=='hidden')syncCloud(false)},30000);
+// Realtime 為主、輪詢為備援；避免啟動階段重複建立連線。
+syncCheckTimer=setInterval(()=>{if(document.visibilityState!=='hidden'&&Date.now()-lastSyncAt>30000)syncCloud(false)},30000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastSyncAt>15000)syncCloud(true)});
 
 const q=document.getElementById('q'),list=document.getElementById('list');
 let sortMode='newest';
