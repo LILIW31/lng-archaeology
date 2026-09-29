@@ -17,7 +17,7 @@
 <div id="syncStatus" class="hint">同步狀態：正在檢查雲端…</div>
 <div class="stats"><div class="stat"><b id="count">0</b><span>目前結果</span></div><div class="stat"><b id="all">0</b><span>資料筆數</span></div><div class="stat"><b>即時</b><span>Supabase 即時同步</span></div></div>
 <section id="list"></section>
-<div class="foot">本資料庫以公開可查的「實況精華／剪輯」為主；使用者回報會自動比對並合併重疊的影片、標題、關鍵字與來源，避免同一支精華被建立多筆。，不收錄直播紀錄檔作為主要資料。若回報的是原始 VOD，系統不會將它當成精華資料。時間碼若只存在於非官方精華，會明確標示「精華時間碼」，不冒充原始 VOD 時間碼。</div>
+<div class="foot">本資料庫以公開可查的「實況精華／剪輯」為主；使用者回報會自動比對並合併重疊的影片、標題、關鍵字與來源，避免同一支精華被建立多筆。不收錄直播紀錄檔作為主要資料。若回報的是原始 VOD，系統不會將它當成精華資料。時間碼若只存在於非官方精華，會明確標示「精華時間碼」，不冒充原始 VOD 時間碼。</div>
 </main>
 <script>
 const BASE_DATA=[
@@ -143,7 +143,7 @@ function render(){let term=q.value.trim();let arr=DATA.filter(isHighlight).filte
 document.getElementById('searchBtn').addEventListener('click',()=>{q.focus();render()});q.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();render();q.blur()}});q.addEventListener('input',render);document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.filters button').forEach(z=>z.classList.remove('active'));b.classList.add('active');filter=b.dataset.f;render()});
 const reportPanel=document.getElementById('reportPanel');
 document.getElementById('reportBtn').onclick=()=>{reportPanel.classList.add('show');reportPanel.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>reportPanel.querySelector('input[name="title"]').focus(),250)};document.getElementById('closeReport').onclick=()=>reportPanel.classList.remove('show');
-document.getElementById('reportForm').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const video=f.get('video');const x={id:'LNG-U'+Date.now().toString().slice(-8),s:'user',t:String(f.get('title')).trim(),k:String(f.get('keywords')).split(',').map(v=>v.trim()).filter(Boolean),p:f.get('people')||'待確認',d:f.get('date')||'待確認',time:f.get('time')||'待確認',note:`使用者回報${f.get('reporter')?'（'+f.get('reporter')+'）':''}：${f.get('note')||'無補充說明'}`,links:[['影片',video]]};try{const result=await submitCloud(x);if(!result){alert('回報失敗：目前無法寫入 Supabase，請稍後再試。');return}await syncCloud(false);e.target.reset();const merged=result.action==='merged';setSyncStatus('同步狀態：🟢 已寫入 Supabase｜${merged?'已自動整合到既有資料':'已新增考古資料'}');alert(merged?'回報成功！系統已找到重疊資料並自動合併，沒有建立重複項目。':'回報成功！已新增到共同考古資料庫，其他使用者可立即看到。')}catch{alert('回報失敗：無法連線 Supabase，這次沒有加入本機資料。')}});
+document.getElementById('reportForm').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const video=f.get('video');const x={id:'LNG-U'+Date.now().toString().slice(-8),s:'user',t:String(f.get('title')).trim(),k:String(f.get('keywords')).split(',').map(v=>v.trim()).filter(Boolean),p:f.get('people')||'待確認',d:f.get('date')||'待確認',time:f.get('time')||'待確認',note:`使用者回報${f.get('reporter')?'（'+f.get('reporter')+'）':''}：${f.get('note')||'無補充說明'}`,links:[['影片',video]]};try{const result=await submitCloud(x);if(!result){alert('回報失敗：目前無法寫入 Supabase，請稍後再試。');return}await syncCloud(false);e.target.reset();const merged=result.action==='merged';setSyncStatus('同步狀態：🟢 已寫入 Supabase｜'+(merged?'已自動整合到既有資料':'已新增考古資料'));alert(merged?'回報成功！系統已找到重疊資料並自動合併，沒有建立重複項目。':'回報成功！已新增到共同考古資料庫，其他使用者可立即看到。')}catch{alert('回報失敗：無法連線 Supabase，這次沒有加入本機資料。')}});
 
 const cloudPanel=document.getElementById('cloudPanel');
 document.getElementById('cloudBtn').onclick=()=>{document.getElementById('sbUrl').value=SUPABASE_URL;document.getElementById('sbKey').value=SUPABASE_ANON_KEY;cloudPanel.classList.toggle('show')};
