@@ -146,10 +146,15 @@ async function syncCloud(withRealtime=true){
  }catch(e){setSyncStatus('同步狀態：🔴 雲端連線失敗｜'+(e&&e.name==='AbortError'?'連線逾時':'請稍後自動重試'))}
 }
 async function submitCloud(x){
- if(!SUPABASE_URL||!SUPABASE_ANON_KEY)return null;
- const r=await fetch(cloudBase()+'/rest/v1/rpc/merge_lng_entry',{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({p_entry:x})});
- if(!r.ok)return null;
- return await r.json();
+ if(!SUPABASE_URL||!SUPABASE_ANON_KEY)throw new Error('雲端設定不存在');
+ if(!sbClient&&window.supabase)sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+ if(!sbClient)throw new Error('Supabase SDK 尚未載入');
+ try{
+  const {data,error}=await sbClient.rpc('merge_lng_entry',{p_entry:x});
+  if(error)throw new Error(error.message||'Supabase 回報失敗');
+  if(!data||!data.action)throw new Error('雲端沒有回傳有效結果');
+  return data;
+ }catch(e){throw e}
 }
 mergeLocal();
 // Realtime 是主同步機制；每 30 秒做一次輕量輪詢作為斷線／漏事件的備援。
@@ -204,7 +209,17 @@ document.getElementById('latestReports').onclick=()=>{document.querySelectorAll(
 document.getElementById('randomPick').onclick=()=>{const candidates=sortedEntries(DATA.filter(isHighlight));if(!candidates.length)return;const x=candidates[Math.floor(Math.random()*candidates.length)];q.value=x.id;filter='all';document.querySelectorAll('.filters button').forEach(z=>z.classList.toggle('active',z.dataset.f==='all'));currentPage=1;render();setTimeout(()=>{document.getElementById('list').scrollIntoView({behavior:'smooth',block:'start'})},50)};document.getElementById('sortSelect').addEventListener('change',e=>{sortMode=e.target.value;currentPage=1;render()});document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.filters button').forEach(z=>z.classList.remove('active'));b.classList.add('active');filter=b.dataset.f;currentPage=1;render()});
 const reportPanel=document.getElementById('reportPanel');
 document.getElementById('reportBtn').onclick=()=>{reportPanel.classList.add('show');reportPanel.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>reportPanel.querySelector('input[name="title"]').focus(),250)};document.getElementById('closeReport').onclick=()=>reportPanel.classList.remove('show');
-document.getElementById('reportForm').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const video=f.get('video');const x={id:'LNG-0',s:'user',t:String(f.get('title')).trim(),k:String(f.get('keywords')).split(',').map(v=>v.trim()).filter(Boolean),p:f.get('people')||'待確認',d:f.get('date')||'待確認',time:f.get('time')||'待確認',note:`使用者回報${f.get('reporter')?'（'+f.get('reporter')+'）':''}：${f.get('note')||'無補充說明'}${f.get('relatedIds')?'｜使用者指出重複編號：'+f.get('relatedIds'):''}`,links:[['影片',video]]};try{const result=await submitCloud(x);if(!result){alert('回報失敗：目前無法寫入 Supabase，請稍後再試。');return}await syncCloud(false);e.target.reset();const merged=result.action==='merged';setSyncStatus('同步狀態：🟢 已寫入 Supabase｜'+(merged?'已自動整合到既有資料':'已新增考古資料'));alert(merged?'回報成功！系統已找到重疊資料並整合。':'回報成功！已新增到共同考古資料庫，其他使用者可立即看到。')}catch{alert('回報失敗：無法連線 Supabase，這次沒有加入本機資料。')}});
+document.getElementById('reportForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const form=e.target,btn=form.querySelector('button[type="submit"]'),f=new FormData(form),video=String(f.get('video')||'').trim(),title=String(f.get('title')||'').trim(),keywords=String(f.get('keywords')||'').split(/[,，、]/).map(v=>v.trim()).filter(Boolean);
+ if(!title||!keywords.length||!video){alert('請完整填寫：精華影片名稱、關鍵字、影片網址。');return}
+ try{new URL(video)}catch{alert('影片網址格式不正確，請貼上完整網址。');return}
+ btn.disabled=true;btn.textContent='送出中…';setSyncStatus('同步狀態：🟡 正在送出使用者回報…');
+ const x={id:'LNG-0',s:'user',t:title,k:keywords,p:String(f.get('people')||'').trim()||'待確認',d:String(f.get('date')||'').trim()||'待確認',time:String(f.get('time')||'').trim()||'待確認',note:`使用者回報${f.get('reporter')?'（'+String(f.get('reporter')).trim()+'）':''}：${String(f.get('note')||'').trim()||'無補充說明'}${String(f.get('relatedIds')||'').trim()?'｜使用者指出重複編號：'+String(f.get('relatedIds')).trim():''}`,links:[['影片',video]]};
+ try{const result=await submitCloud(x);await syncCloud(false);form.reset();currentPage=1;filter='all';document.querySelectorAll('.filters button').forEach(z=>z.classList.toggle('active',z.dataset.f==='all'));render();const merged=result.action==='merged';setSyncStatus('同步狀態：🟢 已寫入 Supabase｜'+(merged?'已自動整合到既有資料':'已新增考古資料'));alert(merged?'回報成功！系統已找到重疊資料並整合。':'回報成功！已新增到共同考古資料庫，其他使用者可立即看到。')}
+ catch(err){setSyncStatus('同步狀態：🔴 回報失敗｜'+(err?.message||'Supabase 寫入失敗'));alert('回報失敗：'+(err?.message||'目前無法寫入雲端。'))}
+ finally{btn.disabled=false;btn.textContent='送出回報'}
+});
 
 const cloudPanel=document.getElementById('cloudPanel');
 document.getElementById('cloudBtn').onclick=()=>{document.getElementById('cloudReadOnly').textContent='目前同步狀態：'+document.getElementById('syncStatus').textContent.replace('同步狀態：','')+'｜設定由網站管理端維護，無法在此更改。';cloudPanel.classList.toggle('show')};
