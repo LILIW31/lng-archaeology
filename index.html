@@ -66,15 +66,18 @@ let SUPABASE_URL = DEFAULT_SUPABASE_URL;
 let SUPABASE_ANON_KEY = DEFAULT_SUPABASE_KEY;
 let sbClient = null, realtimeChannel = null, syncCheckTimer = null, syncInFlight = false;
 let DATA = [...BASE_DATA];
+function canonicalId(v){const m=String(v??'').match(/^LNG-(\d+)$/i);return m?'LNG-'+String(Number(m[1])).padStart(3,'0'):String(v??'')}
+function normalizeAndDedupe(entries){const map=new Map();for(const raw of entries){const x={...raw,id:canonicalId(raw.id)};const prev=map.get(x.id);if(!prev||x.created_at||x.s==='user'||x.links?.length)map.set(x.id,x)}return [...map.values()]}
+DATA=normalizeAndDedupe(DATA);
 let filter='all';
 function isHighlight(x){const s=[x.t,x.note,...(x.k||[])].join(" ").toLowerCase();return !(s.includes("原始vod")||s.includes("原始 v")||s.includes("直播紀錄")||s.includes("直播紀錄檔")||s.includes("vod")&&s.includes("原始"))}
 const localKey='LNG_USER_REPORTS_V1';
 function getLocal(){try{return JSON.parse(localStorage.getItem(localKey)||'[]')}catch{return[]}}
 function saveLocal(a){localStorage.setItem(localKey,JSON.stringify(a))}
 function esc(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[m]))}
-function mergeLocal(){const a=getLocal();const ids=new Set(DATA.map(x=>x.id));a.forEach(x=>{if(!ids.has(x.id))DATA.push(x)})}
+function mergeLocal(){DATA=normalizeAndDedupe([...DATA,...getLocal()])}
 function cloudBase(){return SUPABASE_URL.replace(/\/$/,'')}
-function rowToEntry(x){const links=Array.isArray(x.links)?x.links.map(l=>Array.isArray(l)?l:(l&&typeof l==='object'?[l.label||'影片',l.url||'']:[])).filter(l=>l.length>=2):[];return {id:x.id,s:x.s||'community',t:x.t||'未命名',k:Array.isArray(x.k)?x.k:[],p:x.p||'待確認',d:x.d||'待確認',time:x.time||'待確認',note:x.note||'',links,created_at:x.created_at||null}}
+function rowToEntry(x){const links=Array.isArray(x.links)?x.links.map(l=>Array.isArray(l)?l:(l&&typeof l==='object'?[l.label||'影片',l.url||'']:[])).filter(l=>l.length>=2):[];return {id:canonicalId(x.id),s:x.s||'community',t:x.t||'未命名',k:Array.isArray(x.k)?x.k:[],p:x.p||'待確認',d:x.d||'待確認',time:x.time||'待確認',note:x.note||'',links,created_at:x.created_at||null}}
 function setSyncStatus(t){document.getElementById('syncStatus').textContent=t;const b=document.getElementById('cloudBadge');if(b)b.textContent=t.includes('🟢')?'🟢 已同步':t.includes('🟡')?'🟡 部分連線':'⚪ 未連線'}
 async function startRealtime(){
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY||!window.supabase){return}
@@ -82,8 +85,8 @@ async function startRealtime(){
   if(realtimeChannel&&sbClient){await sbClient.removeChannel(realtimeChannel);realtimeChannel=null}
   sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
   realtimeChannel=sbClient.channel('lng-live-sync')
-   .on('postgres_changes',{event:'INSERT',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);if(!DATA.some(y=>y.id===x.id)){DATA.unshift(x);render();setSyncStatus('同步狀態：🟢 即時連線｜剛收到新資料')}})
-   .on('postgres_changes',{event:'UPDATE',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);const i=DATA.findIndex(y=>y.id===x.id);if(i>=0)DATA[i]=x;else DATA.unshift(x);render();setSyncStatus('同步狀態：🟢 即時連線｜資料已更新')})
+   .on('postgres_changes',{event:'INSERT',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);DATA=normalizeAndDedupe([...DATA,x]);render();setSyncStatus('同步狀態：🟢 即時連線｜剛收到新資料')}})
+   .on('postgres_changes',{event:'UPDATE',schema:'public',table:'lng_entries'},payload=>{const x=rowToEntry(payload.new);DATA=normalizeAndDedupe([...DATA.filter(y=>y.id!==x.id),x]);render();setSyncStatus('同步狀態：🟢 即時連線｜資料已更新')})
    .on('postgres_changes',{event:'DELETE',schema:'public',table:'lng_entries'},payload=>{DATA=DATA.filter(y=>y.id!==payload.old.id);render();setSyncStatus('同步狀態：🟢 即時連線｜資料已刪除')})
    .subscribe(status=>{if(status==='SUBSCRIBED')setSyncStatus('同步狀態：🟢 Supabase 即時連線｜其他使用者新增資料會立即出現');else if(status==='CHANNEL_ERROR')setSyncStatus('同步狀態：🟡 雲端可讀取，但即時推播未連線')});
  }catch(e){setSyncStatus('同步狀態：🟡 雲端可讀取，但即時推播啟動失敗')}
@@ -142,7 +145,7 @@ async function syncCloud(withRealtime=true){
   clearTimeout(timeout);
   if(!r.ok)throw Error('HTTP '+r.status);
   const rows=await r.json();
-  const remote=rows.map(rowToEntry); const byId=new Map(DATA.map(x=>[x.id,x])); remote.forEach(x=>byId.set(x.id,x)); DATA=[...byId.values()]; render();
+  const remote=rows.map(rowToEntry); DATA=normalizeAndDedupe([...DATA,...remote]); const remoteById=new Map(remote.map(x=>[x.id,x])); DATA=DATA.map(x=>remoteById.get(x.id)||x); render();
   setSyncStatus('同步狀態：🟢 雲端已同步｜'+remote.length+' 筆資料');
   if(withRealtime)await startRealtime();
  }catch(e){setSyncStatus('同步狀態：🔴 雲端連線失敗｜'+(e&&e.name==='AbortError'?'連線逾時':'請稍後自動重試'))}
