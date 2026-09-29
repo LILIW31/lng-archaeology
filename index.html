@@ -132,14 +132,21 @@ function duplicateKey(x){return [x.t,x.time,(x.links||[]).map(a=>a[1]).join('|')
 function normalizeSearchText(v){
   return String(v??'').toLowerCase().normalize('NFKC').replace(/[\s\-_/|，。！？、：；（）()「」『』【】\[\]{}]/g,'');
 }
+const pinyinCache=new Map();
 function pinyinSearchText(v){
+  const key=String(v??'');
+  if(!key)return '';
+  if(pinyinCache.has(key))return pinyinCache.get(key);
+  let out='';
   try{
     if(window.pinyinPro&&typeof window.pinyinPro.pinyin==='function'){
       const {pinyin}=window.pinyinPro;
-      return pinyin(String(v??''),{toneType:'none'}).toLowerCase().replace(/\s+/g,'');
+      out=pinyin(key,{toneType:'none'}).toLowerCase().replace(/\s+/g,'');
     }
   }catch(e){}
-  return '';
+  if(pinyinCache.size>500){const first=pinyinCache.keys().next().value;if(first!==undefined)pinyinCache.delete(first)}
+  pinyinCache.set(key,out);
+  return out;
 }
 function searchMatches(x,term){
   if(!term)return true;
@@ -169,23 +176,6 @@ function searchMatches(x,term){
   };
   const qs=[term,...(aliases[term]||[])].map(normalizeSearchText);
   return qs.some(q=>q && rawN.includes(q));
-}
-async function syncCloud(withRealtime=true){
- if(syncInFlight)return;
- if(!SUPABASE_URL||!SUPABASE_ANON_KEY){setSyncStatus('同步狀態：🔴 未設定雲端');return}
- setSyncStatus('同步狀態：🟢 雲端同步運作中');
- syncInFlight=true;
- try{
-  const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),8000);
-  const r=await fetch(cloudBase()+'/rest/v1/lng_entries?select=*',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},signal:controller.signal});
-  clearTimeout(timeout);
-  if(!r.ok)throw Error('HTTP '+r.status);
-  const rows=await r.json();
-  const remote=rows.map(rowToEntry); DATA=normalizeAndDedupe([...DATA,...remote]); const remoteById=new Map(remote.map(x=>[x.id,x])); DATA=DATA.map(x=>remoteById.get(x.id)||x); render();
-  setSyncStatus('同步狀態：🟢 雲端已同步｜'+remote.length+' 筆資料');
-  if(withRealtime)await startRealtime();
- }catch(e){setSyncStatus('同步狀態：🔴 雲端連線失敗｜'+(e&&e.name==='AbortError'?'連線逾時':'請稍後自動重試'))}
- finally{syncInFlight=false}
 }
 async function submitCloud(x){
  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)throw new Error('雲端設定不存在');
