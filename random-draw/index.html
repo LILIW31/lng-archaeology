@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>隨機抽選 1/10</title>
+<title>隨機抽選 1/2</title>
 <style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#090a0f;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}.card{width:min(92vw,560px);background:#17181f;border:1px solid #333540;border-radius:24px;padding:28px;text-align:center;box-shadow:0 20px 70px #0008}h1{font-size:30px;margin:0 0 8px}.desc{color:#aaa;margin-bottom:20px}.odds{padding:15px;background:#24252e;border-radius:16px;margin-bottom:20px}.odds b{display:block;color:#ffd43b;font-size:30px;margin-top:4px}.special-note{font-size:13px;color:#aaa;margin-top:5px}button{appearance:none;-webkit-appearance:none;width:100%;border:0;border-radius:16px;background:#e91e4d;color:white;padding:20px;font-size:24px;font-weight:900;touch-action:manipulation;cursor:pointer}button:active{transform:scale(.98)}button:disabled{opacity:.6}.result{min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.code{font-size:34px;font-weight:900;letter-spacing:2px}.special{color:#ffd43b}.small{font-size:13px;color:#999}</style></head>
-<body><main class="card"><h1>🎲 隨機抽選</h1><div class="desc">每次產生 4 位英文＋3 位數字</div><div class="odds">特殊結果機率<b>1 / 10</b><div class="special-note">特殊結果：NYKD-054</div></div><button id="btn">開始抽選</button><div id="result" class="result"><div class="small">按下按鈕開始</div></div></main>
+<body><main class="card"><h1>🎲 隨機抽選</h1><div class="desc">每次產生 4 位英文＋3 位數字</div><div class="odds">特殊結果機率<b>1 / 2</b><div class="special-note">特殊結果：NYKD-054</div></div><button id="btn">開始抽選</button><div id="result" class="result"><div class="small">按下按鈕開始</div></div></main>
 <script>
 const btn=document.getElementById('btn'),result=document.getElementById('result'),letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 function normal(){let s='';for(let i=0;i<4;i++)s+=letters[Math.floor(Math.random()*26)];return s+'-'+String(Math.floor(Math.random()*1000)).padStart(3,'0')}
-function draw(){if(btn.disabled)return;btn.disabled=true;result.innerHTML='<div class="small">🎲 抽選中...</div>';setTimeout(()=>{let special=Math.floor(Math.random()*10)===0;result.innerHTML=special?'<div class="code special">🎉 NYKD-054</div><div class="small">特殊結果！</div>':'<div class="code">'+normal()+'</div><div class="small">抽選完成</div>';btn.disabled=false},350)}
+function draw(){if(btn.disabled)return;btn.disabled=true;result.innerHTML='<div class="small">🎲 抽選中...</div>';setTimeout(()=>{let special=Math.floor(Math.random()*2)===0;result.innerHTML=special?'<div class="code special">🎉 NYKD-054</div><div class="small">特殊結果！</div>':'<div class="code">'+normal()+'</div><div class="small">抽選完成</div>';btn.disabled=false},350)}
 btn.addEventListener('click',draw);btn.addEventListener('touchend',e=>{e.preventDefault();draw()},{passive:false});
 </script></body></html>
