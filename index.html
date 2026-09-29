@@ -8,7 +8,7 @@
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.action{border:1px solid #3f3f46;background:#18181b;color:#fff;padding:11px;border-radius:12px;font-size:13px}.panel{display:none;background:#111113;border:1px solid #27272a;border-radius:16px;padding:14px;margin:10px 0}.panel.show{display:block}.panel h2{font-size:17px;margin:0 0 10px}.field{margin:8px 0}.field label{display:block;font-size:12px;color:#a1a1aa;margin-bottom:5px}.field input,.field textarea,.field select{width:100%;padding:11px;border-radius:10px;border:1px solid #3f3f46;background:#18181b;color:#fff;font-size:14px}.field textarea{min-height:80px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.primary{background:#fff;color:#111;border:0}.secondary{background:#27272a}.hint{font-size:11px;color:#a1a1aa;line-height:1.6}.notice{padding:10px;border-radius:10px;background:#172554;color:#bfdbfe;font-size:12px;line-height:1.6;margin:8px 0}.report{border-color:#334155}.userbadge{background:#312e81;color:#ddd6fe}.small{font-size:11px}.danger{background:#450a0a;color:#fecaca;border-color:#7f1d1d}.adminBar{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.cloudBtn{border:1px solid #3f3f46;background:#18181b;color:#fff;padding:8px 11px;border-radius:10px;font-size:12px}.adminState{font-size:12px;color:#a1a1aa;display:flex;align-items:center}.syncLine{font-size:12px;color:#a1a1aa;background:#111113;border:1px solid #27272a;border-radius:10px;padding:9px 11px;margin:10px 0}.locked{opacity:.65}@media(max-width:560px){.actions,.row{grid-template-columns:1fr}}
 </style><script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
 <body>
-<header><h1>🎬 LNG 考古精華資料庫</h1><div class="sub">以「實況精華／剪輯」為主｜粉絲記得的句子 → 關鍵字 → 候選精華 → 時間碼 → 來源驗證</div><div class="update">資料庫：持續擴充｜最後整理：2026-09-29</div></header>
+<header><h1>🎬 LNG 考古精華資料庫</h1><div class="sub">以「實況精華／剪輯」為主｜不限定剪輯者｜粉絲記得的句子 → 關鍵字 → 候選精華 → 時間碼 → 來源驗證</div><div class="update">資料庫：持續擴充｜任何人剪輯的歷史精華皆可收錄｜最後整理：2026-09-29</div></header>
 <main class="wrap">
 <div class="searchRow"><input id="q" class="search" placeholder="搜尋：台詞、關鍵字、人物、日期、LNG-編號…（支援同音字／拼音）" autocomplete="off"><button class="searchBtn" id="searchBtn" type="button">🔎 搜尋</button></div>
 <div class="sortRow"><label for="sortSelect">排序</label><select id="sortSelect" class="sortSelect"><option value="newest">新增順序：新→舊</option><option value="oldest">新增順序：舊→新</option><option value="id">編號排序：LNG-小→大</option></select></div><div class="filters"><button class="active" data-f="all">全部</button><button data-f="confirmed">🟢 已確認</button><button data-f="community">🟡 社群考古</button><button data-f="pending">🔴 待驗證</button></div><div class="actions"><button class="action primary" id="reportBtn">➕ 回報影片／關鍵字</button></div><button class="action secondary" id="cloudBtn">☁️ 雲端同步設定 <span id="cloudBadge">檢查中…</span></button>
@@ -17,7 +17,7 @@
 <div class="syncLine" id="syncStatus">同步狀態：🟡 啟動中</div>
 <div class="stats"><div class="stat"><b id="count">0</b><span>目前結果</span></div><div class="stat"><b id="all">0</b><span>資料筆數</span></div><div class="stat"><b>即時</b><span>Supabase 即時同步</span></div></div>
 <section id="list"></section><div id="pagination" class="pagination"></div>
-<div class="foot">本資料庫以公開可查的「實況精華／剪輯」為主；使用者回報會自動比對並合併重疊的影片、標題、關鍵字與來源，避免同一支精華被建立多筆。不收錄直播紀錄檔作為主要資料。若回報的是原始 VOD，系統不會將它當成精華資料。時間碼若只存在於非官方精華，會明確標示「精華時間碼」，不冒充原始 VOD 時間碼。</div>
+<div class="foot">本資料庫以公開可查的「實況精華／剪輯」為主，不限定由懶熊剪輯；只要能驗證為 LNG 歷史精華，粉絲或其他剪輯者製作的版本也可收錄。使用者回報會自動比對並合併重疊的影片、標題、關鍵字與來源，避免同一支精華被建立多筆。不收錄直播紀錄檔作為主要資料。若回報的是原始 VOD，系統不會將它當成精華資料。時間碼若只存在於非官方精華，會明確標示「精華時間碼」，不冒充原始 VOD 時間碼。</div>
 </main>
 <script>
 const BASE_DATA=[
@@ -57,7 +57,9 @@ const BASE_DATA=[
 {id:'LNG-11',s:'community',t:'LNG 實況精華：我要揍死你',k:['我要揍死你','2015/06/20','六嘆','鳥屎','老王','八毛','Leggy'],p:'六嘆／鳥屎／老王／八毛／Leggy',d:'2015-06-20',time:'待逐秒驗證',note:'公開影音索引可確認影片日期與 LNG 成員；原始 VOD 時間軸尚待考古。',links:[['影音索引','https://m.acfun.cn/v/?ac=2094643']]},
 {id:'LNG-12',s:'community',t:'LNG 實況精華：如果我有30億',k:['如果我有30億','2015/04/26','六嘆','鳥屎','老王','八毛','Leggy'],p:'六嘆／鳥屎／老王／八毛／Leggy',d:'2015-04-26',time:'待逐秒驗證',note:'公開影音索引可確認影片日期與 LNG 成員；可作為後續梗搜尋入口。',links:[['影音索引','https://m.acfun.cn/v/?ac=1875687']]},
 {id:'LNG-13',s:'community',t:'LNG 實況精華：歐齁歐齁',k:['歐齁歐齁','2013/11/23'],p:'六嘆／鳥屎／老王／八毛／Leggy',d:'2013-11-23',time:'待逐秒驗證',note:'公開影音索引可確認早期 LNG 精華日期；原始 VOD 與梗內容待進一步定位。',links:[['影音索引','https://m.acfun.cn/v/?ac=1913257']]}
-];
+,
+{id:'LNG-72',s:'confirmed',t:'LNG｜怪獸與山羊的產地 2017/02/12 實況精華',k:['怪獸與山羊的產地','2017/02/12','六嘆','鳥屎','老王','八毛','小六','oligo123oligo123'],p:'六嘆／鳥屎／老王／八毛／小六',d:'2017-02-12',time:'待逐秒驗證',note:'其他粉絲剪輯。YouTube 影片頁明確標示為「實況精華」，並列出主持人與原始影片；剪輯者為 oligo123oligo123。',links:[['YouTube精華','https://www.youtube.com/watch?v=tPvatl5e3AM']]},
+{id:'LNG-73',s:'confirmed',t:'LNG｜原來過去這麼羞恥 2017/01/15 實況精華',k:['原來過去這麼羞恥','2017/01/15','六嘆','鳥屎','老王','Leggy','八毛','小六','中二黑歷史','無名小站','oligo123oligo123'],p:'六嘆／鳥屎／老王／Leggy／八毛／小六',d:'2017-01-15',time:'待逐秒驗證',note:'其他粉絲剪輯。YouTube 影片頁明確標示為「實況精華」，描述列出主持人與原始影片；剪輯者為 oligo123oligo123。',links:[['YouTube精華','https://www.youtube.com/watch?v=MRMDca45L_c']]}];
 const DEFAULT_SUPABASE_URL = 'https://qpwqjraegxwxytlhzfmr.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'sb_publishable_DMT8Fbyowdu3IGGZIGU3eg_3NEbtdjr';
 let SUPABASE_URL = DEFAULT_SUPABASE_URL;
